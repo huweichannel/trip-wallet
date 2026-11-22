@@ -1,0 +1,1 @@
+window.CONFIG={API_URL:"https://script.google.com/macros/s/AKfycby5E8JuRGaYRDMsRdVmzzIaVZPX49TMWf3s4xZ_--N2l_kMOVmirQKTntypm1WrD6e-/exec",CLIENT_ID:"1066765409975-d686te2k1h2aplp43u7panu35he5djc8.apps.googleusercontent.com"};

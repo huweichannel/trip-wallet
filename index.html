@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Trip Wallet">
+<meta name="theme-color" content="#f2f2f7">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Trip Wallet</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: iOS-style light app. Grey ground, white grouped cards, 5-slot tab bar with centre + button, add = bottom sheet with keypad */
+:root{
+  color-scheme:light;
+  --ground:#f2f2f7; --card:#ffffff; --ink:#1c1c1e; --ink2:#6b6b73; --hair:#e5e5ea;
+  --brand:#16a34a; --brand-soft:#e8f7ee; --spend:#e5484d; --warn:#c77700;
+  --food:#ff9f0a; --food-bg:#fff4e0; --transit:#0a84ff; --transit-bg:#e6f1ff;
+  --tickets:#af52de; --tickets-bg:#f5eafb; --shop:#ff375f; --shop-bg:#ffe8ee;
+  --hotel:#30b0c7; --hotel-bg:#e3f6f9; --flight:#5e5ce6; --flight-bg:#ececfd;
+  --other:#8e8e93; --other-bg:#f0f0f3;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--ground);color:var(--ink);font-family:var(--font);font-size:15px;-webkit-font-smoothing:antialiased}
+.app{max-width:430px;margin:0 auto;min-height:100%;position:relative;padding-bottom:96px}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.note{font-size:11px;color:var(--ink2);text-align:center;padding-block:6px 0}
+header{padding-block:10px 6px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:28px;font-weight:700;margin:0;letter-spacing:-.02em}
+.sub{font-size:13px;color:var(--ink2)}
+.pill{font-size:12px;font-weight:600;border-radius:999px;padding:4px 10px;display:inline-flex;gap:6px;align-items:center;background:var(--brand-soft);color:var(--brand)}
+.pill.q{background:#fff4e0;color:var(--warn)}
+.pill i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.card{background:var(--card);border-radius:16px;padding:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.k{font-size:12px;color:var(--ink2);font-weight:500}
+.v{font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.v.sm{font-size:18px}
+.y{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:3px;background:var(--hair);overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;background:var(--brand);border-radius:3px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{border-radius:14px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:600;min-width:0}
+.tile .ic{width:36px;height:36px}
+.tile b{font-size:13px;font-variant-numeric:tabular-nums}
+.ic{border-radius:50%;display:grid;place-items:center;flex:none;width:34px;height:34px}
+.ic svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sec{font-size:13px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em;padding:6px 4px 0}
+.day{background:var(--card);border-radius:16px;overflow:hidden}
+.dayh{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--hair)}
+.dayh .n{font-size:24px;font-weight:700;width:34px}
+.dayh .w{font-size:11px;font-weight:600;color:#fff;background:var(--ink2);border-radius:4px;padding:1px 5px}
+.dayh .t{margin-left:auto;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:var(--spend)}
+.tx{display:flex;align-items:center;gap:12px;padding:10px 16px}
+.tx+.tx{border-top:1px solid var(--hair)}
+.tx .m{flex:1;min-width:0}
+.tx .m div{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx .m small{color:var(--ink2);font-size:12px}
+.tx .a{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.tx .a small{display:block;font-weight:400;color:var(--ink2);font-size:12px}
+.tag{font-size:10px;font-weight:600;border-radius:4px;padding:1px 5px;background:var(--brand-soft);color:var(--brand);margin-left:4px}
+/* tab bar */
+nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--hair);padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+nav .in{max-width:430px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+nav button{border:0;background:none;color:var(--ink2);font:500 10px var(--font);padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--brand)}
+nav .plus{width:52px;height:52px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;margin:-18px auto 0;box-shadow:0 6px 16px rgba(22,163,74,.35);padding:0}
+nav .plus svg{width:26px;height:26px;stroke:#fff;stroke-width:2.4}
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:10}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:11;background:var(--ground);border-radius:20px 20px 0 0;max-width:430px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom,0px);max-height:94%;overflow:auto}
+.sheet .grab{width:36px;height:5px;border-radius:3px;background:#c7c7cc;margin:8px auto 4px}
+.shead{display:flex;justify-content:space-between;align-items:center;padding-block:4px 8px}
+.shead button{border:0;background:none;color:var(--brand);font:500 16px var(--font);cursor:pointer;padding:6px 0}
+.shead b{font-size:16px}
+.amount{background:var(--card);border-radius:16px;padding:12px 16px;display:flex;align-items:center;gap:10px}
+.seg{display:inline-flex;background:var(--ground);border-radius:9px;padding:2px}
+.seg button{border:0;background:none;font:600 13px var(--font);color:var(--ink2);padding:6px 10px;border-radius:7px;cursor:pointer}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.amount .num{margin-left:auto;text-align:right;min-width:0}
+.amount .num div{font-size:34px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.amount .num small{font-size:12px;color:var(--ink2)}
+.cats{display:flex;gap:8px;overflow-x:auto;padding:10px 2px 4px;scrollbar-width:none}
+.cats::-webkit-scrollbar{display:none}
+.cat{flex:none;border:0;background:var(--card);border-radius:14px;padding:8px 10px 8px 8px;display:flex;align-items:center;gap:8px;font:600 13px var(--font);color:var(--ink);cursor:pointer;outline:2px solid transparent}
+.cat .ic{width:28px;height:28px}
+.cat .ic svg{width:15px;height:15px}
+.cat.on{outline-color:var(--brand)}
+.fields{background:var(--card);border-radius:16px;margin-top:8px}
+.f{display:flex;align-items:center;gap:10px;padding:10px 16px;min-height:28px}
+.f+.f{border-top:1px solid var(--hair)}
+.f label{font-size:14px;color:var(--ink2);width:64px;flex:none}
+.f input{border:0;outline:0;font:15px var(--font);color:var(--ink);background:none;flex:1;min-width:0;padding:4px 0}
+.f .chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--hair);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 11px;font:500 13px var(--font);cursor:pointer}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding-block:10px 12px}
+.keys button{border:0;background:var(--card);border-radius:12px;height:50px;font:500 22px var(--font);color:var(--ink);cursor:pointer;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+.keys button.fn{background:#e5e5ea;font-size:17px}
+.keys button.ok{background:var(--brand);color:#fff;grid-row:span 2;height:auto;font-size:15px;font-weight:600}
+/* stats */
+.donut{display:flex;align-items:center;gap:16px}
+.donut svg{width:132px;height:132px;flex:none}
+.legend{display:flex;flex-direction:column;gap:6px;font-size:13px;flex:1;min-width:0}
+.legend div{display:flex;align-items:center;gap:6px}
+.legend i{width:9px;height:9px;border-radius:50%;flex:none}
+.legend span{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink2)}
+.cols{display:flex;align-items:flex-end;gap:5px;height:120px;margin-top:8px}
+.cols div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%;min-width:0}
+.cols i{width:100%;border-radius:5px 5px 2px 2px;background:#cdeedb;min-height:3px}
+.cols .now i{background:var(--brand)}
+.cols span{font-size:10px;color:var(--ink2)}
+.rowc{display:flex;align-items:center;gap:12px;padding:10px 0}
+.rowc+.rowc{border-top:1px solid var(--hair)}
+.rowc .m{flex:1;min-width:0}
+.rowc .m div{font-weight:500}
+.rowc .bar{margin-top:6px}
+.rowc .a{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.rowc .a small{display:block;font-weight:400;color:var(--ink2);font-size:12px}
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal .h{font-size:11px;color:var(--ink2);font-weight:600;padding-bottom:4px}
+.cal .c{border-radius:10px;padding:6px 0 5px;font-size:15px;font-weight:600;min-height:44px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.cal .c small{font-size:10px;font-weight:500;color:var(--spend);font-variant-numeric:tabular-nums}
+.cal .c.trip{background:var(--brand-soft)}
+.cal .c.off{color:#c7c7cc}
+.cal .c.now{outline:2px solid var(--brand)}
+/* lock: Google sign-in once, then Face ID on each open */
+.lock{position:fixed;inset:0;background:var(--ground);z-index:20;display:flex;align-items:center;justify-content:center;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));transition:opacity .5s ease,transform .732s var(--smooth)}
+.lock.gone{opacity:0;transform:scale(1.04);pointer-events:none}
+.step{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;width:100%;max-width:320px;animation:rise .732s var(--smooth) both}
+.step h2{margin:0;font-size:26px;letter-spacing:-.02em}
+.step .sub{margin-top:-8px}
+.appic{width:76px;height:76px;border-radius:18px;background:linear-gradient(160deg,#22c55e,#15803d);display:grid;place-items:center;box-shadow:0 10px 24px rgba(22,163,74,.28);margin-bottom:6px}
+.appic svg{width:38px;height:38px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.gbtn{margin-top:18px;width:100%;height:50px;border-radius:999px;border:1px solid #dadce0;background:#fff;display:flex;align-items:center;justify-content:center;gap:10px;font:600 16px var(--font);color:#1f1f1f;cursor:pointer}
+.gbtn svg{width:20px;height:20px}
+.spin{width:18px;height:18px;border-radius:50%;border:2px solid #dadce0;border-top-color:#4285f4;animation:spin .8s linear infinite}
+.fine{font-size:12px;color:var(--ink2);max-width:260px}
+.face{width:96px;height:96px;border:0;background:none;padding:0;cursor:pointer;display:grid;place-items:center}
+.face svg{width:84px;height:84px;stroke:var(--brand);fill:none;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+.face.scan svg{animation:scan .7s ease-in-out infinite alternate}
+.face.ok svg{animation:pop .784s var(--bouncy)}
+.link{border:0;background:none;color:var(--brand);font:600 16px var(--font);cursor:pointer;padding:8px}
+.toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;white-space:nowrap;pointer-events:none;opacity:0;transform:translate(-50%,-14px) scale(.96);transition:opacity .25s ease,transform .517s var(--snappy)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.set .f label{width:auto;flex:1;color:var(--ink)}
+.set .f span{color:var(--ink2);font-size:14px;text-align:right}
+.set button.f{width:100%;border:0;background:none;font:inherit;cursor:pointer;text-align:left}
+.set button.f label{color:var(--brand);cursor:pointer}
+.set button.f+button.f{border-top:1px solid var(--hair)}
+.set #signOut label{color:var(--spend)}
+.step.done .sub,.step.done .link{visibility:hidden}
+button:focus-visible,input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* motion: Apple-style springs as CSS linear() (smooth 732ms, snappy 517ms, bouncy 784ms). Only transform + opacity move. */
+:root{--smooth:cubic-bezier(.32,.72,0,1);--snappy:cubic-bezier(.32,.72,0,1);--bouncy:cubic-bezier(.34,1.4,.64,1)}
+@supports (transition-timing-function:linear(0,1)){:root{
+ --smooth:linear(0,0.043,0.141,0.259,0.378,0.489,0.586,0.669,0.738,0.794,0.84,0.876,0.904,0.926,0.944,0.957,0.967,0.975,0.981,0.986,0.989,0.992,0.994,0.996,0.997,0.998,0.998,0.999,1);
+ --snappy:linear(0,0.036,0.121,0.231,0.349,0.464,0.569,0.662,0.741,0.807,0.859,0.901,0.932,0.956,0.974,0.986,0.995,1,1.004,1.005,1.006,1.006,1.006,1.005,1.005,1.004,1.003,1.002,1);
+ --bouncy:linear(0,0.052,0.176,0.332,0.491,0.638,0.763,0.862,0.936,0.987,1.02,1.038,1.045,1.045,1.041,1.034,1.027,1.02,1.014,1.008,1.004,1.002,1,0.999,0.998,0.998,0.998,0.998,1)}}
+/* sheet slides up on the smooth spring, scrim fades; drag the top bar down to close */
+.scrim{opacity:0;pointer-events:none;transition:opacity .4s ease}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{transform:translateY(105%);visibility:hidden;transition:transform .732s var(--smooth),visibility 0s .732s}
+.sheet.open{transform:none;visibility:visible;transition:transform .732s var(--smooth),visibility 0s}
+.sheet .grab,.sheet .shead{touch-action:none}
+.sheet .grab{padding-block:4px;background-clip:content-box;cursor:grab}
+/* press = quick scale down, release springs back */
+button{transition:transform .517s var(--snappy)}
+button:active{transform:scale(.96);transition:transform .1s ease-out}
+nav .plus:active{transform:scale(.9)}
+.keys button:active{transform:scale(.92)}
+/* view switch = fade + small rise; lists and tiles stagger 30ms */
+.enter>*{animation:rise .55s var(--smooth) both;animation-delay:calc(var(--i,0) * 30ms)}
+.pop{animation:pop .517s var(--snappy)}
+.chip.on,.cat.on,.seg button.on{animation:pop .784s var(--bouncy)}
+.shake{animation:shake .42s ease-out}
+.cols i{transform-origin:bottom;animation:growY .732s var(--smooth) both;animation-delay:calc(var(--i,0) * 30ms)}
+.rowc .bar i{transform-origin:left;animation:growX .732s var(--smooth) both;animation-delay:calc(var(--i,0) * 30ms)}
+.donut .ring{transform-origin:21px 21px;animation:spinIn .9s var(--smooth) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+@keyframes pop{from{transform:scale(.9)}}
+@keyframes growY{from{transform:scaleY(0)}}
+@keyframes growX{from{transform:scaleX(0)}}
+@keyframes spinIn{from{opacity:0;transform:rotate(-90deg) scale(.85)}}
+@keyframes shake{20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes scan{to{transform:scale(.92);opacity:.55}}
+/* reduced motion: fades only */
+@media (prefers-reduced-motion:reduce){
+ .sheet,.sheet.open{transform:none;opacity:0;transition:opacity .2s,visibility 0s .2s}
+ .sheet.open{opacity:1;transition:opacity .2s,visibility 0s}
+ button:active,nav .plus:active,.keys button:active{transform:none}
+ .lock.gone{transform:none}
+ .toast,.toast.show{transform:translate(-50%,0)}
+ @keyframes rise{from{opacity:0}}
+ @keyframes pop{from{opacity:1}}
+ @keyframes growY{from{opacity:0}}
+ @keyframes growX{from{opacity:0}}
+ @keyframes spinIn{from{opacity:0}}
+ @keyframes shake{from{opacity:1}}
+ @keyframes scan{to{opacity:.55}}
+}
+
+/* real-app additions (design tokens unchanged) */
+body{margin:0;padding:0}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.gwrap{position:relative;width:100%;margin-top:18px}
+.gwrap .gbtn{margin-top:0}
+.gover{position:absolute;inset:0;opacity:.01;overflow:hidden;display:flex;align-items:center;justify-content:center;border-radius:999px}
+.gover:empty{display:none}
+.gover>*{transform:scaleY(1.3)}
+.link.s14{font-size:14px;padding:4px 8px}
+.codebox{display:flex;flex-direction:column;gap:10px;width:100%}
+.codein{width:100%;height:50px;border-radius:14px;border:1px solid var(--hair);background:#fff;font:600 22px var(--font);color:var(--ink);text-align:center;letter-spacing:.2em;text-transform:uppercase;outline:0}
+.modal{position:fixed;inset:0;z-index:15;background:rgba(0,0,0,.32);display:flex;align-items:center;justify-content:center;padding:24px;animation:rise .55s var(--smooth) both}
+.mcard{width:100%;max-width:320px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.mcard .code{font-size:34px;font-weight:700;letter-spacing:.14em;font-variant-numeric:tabular-nums;padding-left:.14em}
+#faceRow.tap{cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <section id="v-home" class="wrap stack">
+    <header><div><div class="sub" id="hSub"></div><h1>Today</h1></div><span class="pill" id="sync"><i></i><span>Synced</span></span></header>
+    <div class="card">
+      <div class="k" id="hTodayK">Spent today</div>
+      <div class="v" id="hToday"></div>
+      <div class="y" id="hTodayY"></div>
+    </div>
+    <div class="sum">
+      <div class="card"><div class="k">Trip so far</div><div class="v sm" id="hTrip"></div><div class="y" id="hTripD"></div></div>
+      <div class="card"><div class="k" id="hOweK">Partner owes you</div><div class="v sm" id="hOwe"></div><div class="y">from your sheet</div></div>
+    </div>
+    <div class="sec">This trip by category</div>
+    <div class="tiles" id="tiles"></div>
+    <div class="sec">Recent</div>
+    <div class="stack" id="list"></div>
+  </section>
+
+  <section id="v-cal" class="wrap stack" hidden>
+    <header><div><div class="sub">Tap a day to see items</div><h1>Calendar</h1></div></header>
+    <div class="card"><div class="cal" id="cal"></div></div>
+    <div class="stack" id="calList"></div>
+  </section>
+
+  <section id="v-stats" class="wrap stack" hidden>
+    <header><div><div class="sub">On-trip only · in RM</div><h1>Stats</h1></div>
+      <div class="seg" id="scope"><button class="on" data-s="trip">Trip</button><button data-s="all">All</button></div></header>
+    <div class="card"><div class="donut"><svg viewBox="0 0 42 42" id="donut"></svg><div class="legend" id="legend"></div></div></div>
+    <div class="card"><div class="k">Per day (RM)</div><div class="cols" id="cols"></div></div>
+    <div class="card" id="catRows"></div>
+    <div class="card"><div class="k">By currency</div><div id="curRows"></div></div>
+  </section>
+
+  <section id="v-set" class="wrap stack" hidden>
+    <header><h1>Settings</h1></header>
+    <div class="fields set">
+      <div class="f"><label>Google Sheet</label><span id="sSheet">…</span></div>
+      <div class="f"><label>Rate (from Summary tab)</label><span id="sRate">-</span></div>
+      <div class="f"><label>Default paid by</label><span id="sMe">…</span></div>
+      <div class="f"><label>Default split</label><span>50/50</span></div>
+    </div>
+    <div class="fields set">
+      <div class="f"><label>Signed in</label><span>Google</span></div>
+      <div class="f" id="faceRow"><label>Face ID on open</label><span id="sFace">Off</span></div>
+      <div class="f"><label>Rows left in sheet</label><span id="sLeft">-</span></div>
+      <div class="f"><label>Version</label><span>0.1.0</span></div>
+    </div>
+    <div class="fields set">
+      <button class="f" id="lockNow"><label>Lock now</label></button>
+      <button class="f" id="pairBtn"><label>Add another phone</label></button>
+      <button class="f" id="signOut"><label>Sign out on all phones</label></button>
+    </div>
+    <div class="y" style="padding-inline:4px">Only your Google account can use this app. Sign out on all phones if you lose this phone.</div>
+  </section>
+</div>
+
+<nav><div class="in">
+  <button class="on" data-v="home"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg>Home</button>
+  <button data-v="cal"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Calendar</button>
+  <button class="plus" id="plus" aria-label="Add expense"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button data-v="stats"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>Stats</button>
+  <button data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</button>
+</div></nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet wrap" id="sheet">
+  <div class="grab"></div>
+  <div class="shead"><button id="cancel">Cancel</button><b>New expense</b><button id="save2">Save</button></div>
+  <div class="amount">
+    <div class="seg" id="cur"><button class="on" data-c="JPY">¥</button><button data-c="MYR">RM</button></div>
+    <div class="num"><div id="amt">¥0</div><small id="conv">≈ RM 0.00</small></div>
+  </div>
+  <div class="cats" id="cats"></div>
+  <div class="fields">
+    <div class="f"><label for="desc">For</label><input id="desc" placeholder="e.g. Ramen lunch" maxlength="120"></div>
+    <div class="f"><label>Paid by</label><div class="chips" data-g="pb"><button class="chip on" data-p="me">Me</button><button class="chip" data-p="other" id="pbOther">Partner</button></div></div>
+    <div class="f"><label>Split</label><div class="chips" data-g="sp"><button class="chip on">50/50</button><button class="chip">Only mine</button><button class="chip">Other pays all</button></div></div>
+    <div class="f"><label for="dt">Date</label><input id="dt" type="date"></div>
+  </div>
+  <div class="keys" id="keys"></div>
+</div>
+
+<div class="lock" id="lock">
+  <div class="step" id="stepG">
+    <div class="appic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/><path d="M6 6l9-3 1 3"/></svg></div>
+    <h2>Trip Wallet</h2>
+    <div class="gwrap"><button class="gbtn" id="gbtn"><svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button><div class="gover" id="gover"></div></div>
+    <div class="fine">Only your Google account can open this app. You sign in once on this phone.</div>
+    <button class="link s14" id="codeLink">Use a sign-in code</button>
+    <div class="codebox" id="codeBox" hidden>
+      <input class="codein" id="codeIn" maxlength="8" autocapitalize="characters" autocomplete="one-time-code" autocorrect="off" spellcheck="false" inputmode="text" aria-label="Sign-in code">
+      <button class="gbtn" id="codeGo" style="margin-top:0"><span>Continue</span></button>
+    </div>
+  </div>
+  <div class="step" id="stepF" hidden>
+    <button class="face" id="face" aria-label="Unlock with Face ID"><svg viewBox="0 0 24 24" id="faceSvg"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M9 9v1.5M15 9v1.5M12 9v4h-1M9 16c1.6 1.3 4.4 1.3 6 0"/></svg></button>
+    <h2>Trip Wallet is locked</h2>
+    <div class="sub">Tap to unlock with Face ID</div>
+    <button class="link" id="faceBtn">Use Face ID</button>
+    <button class="link s14" id="faceNot" hidden>Not now</button>
+    <button class="link s14" id="faceAlt" style="color:var(--ink2)">Sign in with Google instead</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal" hidden><div class="card mcard" id="mcard"></div></div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
