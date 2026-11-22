@@ -142,6 +142,7 @@ function setRender(){
 function modal(html,acts){const m=$("modal");$("mcard").innerHTML=html;m.hidden=false;
  m.onclick=e=>{const b=e.target.closest("[data-a]");if(b){const f=acts[b.dataset.a];if(f)f();}else if(e.target===m)closeModal();};}
 function closeModal(){$("modal").hidden=true;}
+function busy(t){const m=$("modal");$("mcard").innerHTML=`<div class="busy"><span class="spin"></span><span>${t}</span></div>`;m.hidden=false;m.onclick=null;}
 $("pairBtn").onclick=async()=>{
  const r=await api({a:"pair_new",token:token()});
  if(r.ok)modal(`<div class="k">Add another phone</div><div class="code">${esc(r.code)}</div><div class="y">Type this code on the other phone. It works for 5 minutes.</div><button class="link" data-a="x">Close</button>`,{x:closeModal});
@@ -194,7 +195,7 @@ async function save(){
  const item={date:dv,cat:CAT[cat][0],desc:$("desc").value.trim()||CAT[cat][1],cur,amt:a,paidBy:pb==="other"?"other":"me",split:sp==="50/50"?"50/50 Split":sp==="Other pays all"?"100% Owed by Other":"Exact Amount"};
  if(edit&&edit.q){const i=queue.findIndex(x=>x.id===edit.q);if(i>=0)queue[i]=Object.assign({id:edit.q},item);saveQ();closeS();toast("Saved");render();flush();return;}
  if(edit){if(wbusy)return;if(edit.other>0&&item.split==="Exact Amount"&&sp===SPCHIP["Exact Amount"])item.other=edit.other;
-  wbusy=true;const r=await api(Object.assign({a:"edit",token:token(),row:edit.row,was:edit.was},item));wbusy=false;result(r,"Updated",closeS);return;}
+  wbusy=true;busy("Saving…");const r=await api(Object.assign({a:"edit",token:token(),row:edit.row,was:edit.was},item));wbusy=false;closeModal();result(r,"Updated",closeS);return;}
  queue.push(Object.assign({id:uuid()},item));
  saveQ();sset("tw.last",{cat,cur});amt="";$("desc").value="";show();closeS();toast("Saved");render();flush();}
 function openEdit(key){
@@ -208,7 +209,7 @@ $("list").onclick=tapRow;$("calList").onclick=tapRow;
 function confirmDel(what,go){modal(`<div class="k">Delete this ${what}?</div><button class="link" style="color:var(--spend)" data-a="go">Delete</button><button class="link" data-a="no">Cancel</button>`,{no:closeModal,go:()=>{closeModal();go();}});}
 $("delBtn").onclick=()=>{const e=edit;if(!e)return;confirmDel("expense",async()=>{
  if(e.q){queue=queue.filter(x=>x.id!==e.q);saveQ();closeS();render();toast("Deleted");return;}
- if(wbusy)return;wbusy=true;const r=await api({a:"del",token:token(),row:e.row,was:e.was});wbusy=false;result(r,"Deleted",closeS);});};
+ if(wbusy)return;wbusy=true;busy("Deleting…");const r=await api({a:"del",token:token(),row:e.row,was:e.was});wbusy=false;closeModal();result(r,"Deleted",closeS);});};
 /* one answer handler for edit, delete and pay-back writes */
 function result(r,msg,done){
  if(r.ok){setCache(r);render();if(done)done();toast(msg);}
@@ -236,14 +237,14 @@ async function pSave(){
  if(a>=1e7){toast("Amount is too big");return;}
  const dv=$("pDt").value||today();if(dv<"2026-01-01"||dv>"2027-12-31"){toast("Check the date");return;}
  const f={date:dv,from:document.querySelector('[data-g="pd"] .on').dataset.d,cur:cu,amt:a,ref:$("pRef").value.trim(),notes:$("pNote").value.trim()};
- const was=pedit;wbusy=true;
+ const was=pedit;wbusy=true;busy("Saving…");
  const r=await api(was?Object.assign({a:"pay_edit",token:token(),row:was.row,was:was.was},f):Object.assign({a:"pay",token:token(),id:uuid()},f));
- wbusy=false;result(r,was?"Updated":"Pay-back saved",pBack);}
+ wbusy=false;closeModal();result(r,was?"Updated":"Pay-back saved",pBack);}
 $("oweCard").onclick=()=>{pBack();pRender();openSheet($("sheet2"));};
 $("pAdd").onclick=()=>pOpen(null);$("pBack").onclick=pBack;$("pClose").onclick=closeS;$("pSave").onclick=pSave;
 $("pList").onclick=e=>{const t=e.target.closest("[data-p]");if(!t)return;const p=pays().find(x=>String(x.row)===t.dataset.p);if(p)pOpen(p);};
 $("pDel").onclick=()=>{const was=pedit;if(!was)return;confirmDel("pay-back",async()=>{
- if(wbusy)return;wbusy=true;const r=await api({a:"pay_del",token:token(),row:was.row,was:was.was});wbusy=false;result(r,"Deleted",pBack);});};
+ if(wbusy)return;wbusy=true;busy("Deleting…");const r=await api({a:"pay_del",token:token(),row:was.row,was:was.was});wbusy=false;closeModal();result(r,"Deleted",pBack);});};
 
 /* ---------- queue ---------- */
 let fullStop=false;
