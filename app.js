@@ -33,6 +33,8 @@ const dname=d=>new Date(d+"T00:00:00Z").toLocaleDateString("en-GB",{weekday:"sho
 /* ---------- state ---------- */
 let data=sget("tw.cache",null);if(!data||!Array.isArray(data.rows))data=null;
 let queue=sget("tw.queue",[]);if(!Array.isArray(queue))queue=[];
+let view=sget("tw.view","mine")==="all"?"all":"mine";
+let edit=null,pedit=null,wbusy=false;
 const token=()=>sget("tw.token",null);
 const credId=()=>sget("tw.cred",null);
 const saveQ=()=>sset("tw.queue",queue);
@@ -58,10 +60,14 @@ async function api(p){
 
 /* ---------- rows ---------- */
 const stageOf=d=>d>=T0()?"On-Trip":"Pre-Trip";
-function srvRow(r){return{date:String(r.date),k:KEYOF[r.cat]||"other",desc:String(r.desc==null?"":r.desc),cur:r.cur==="MYR"?"MYR":"JPY",amt:Number(r.amt)||0,pb:r.paidBy==="me"?"Me":"Other",split:String(r.split),stage:String(r.stage)};}
-function qRow(q){return{date:q.date,k:KEYOF[q.cat]||"other",desc:q.desc,cur:q.cur,amt:q.amt,pb:q.paidBy==="me"?"Me":"Other",split:q.split,stage:stageOf(q.date)};}
+function srvRow(r){const was={date:String(r.date),cat:r.cat,desc:String(r.desc==null?"":r.desc),cur:r.cur,amt:Number(r.amt)||0,paidBy:r.paidBy,split:String(r.split)};
+ return{key:"s"+r.row,row:r.row,was:was,other:r.other==null?null:Number(r.other),meS:Number(r.meShare)||0,date:was.date,k:KEYOF[r.cat]||"other",desc:was.desc,cur:r.cur==="MYR"?"MYR":"JPY",amt:was.amt,pb:r.paidBy==="me"?"Me":"Other",split:was.split,stage:String(r.stage)};}
+function qRow(q){const me=q.paidBy==="me",a=q.amt;
+ return{key:"q"+q.id,q:q,meS:q.split==="50/50 Split"?a/2:q.split==="100% Owed by Other"?(me?0:a):(me?a:0),date:q.date,k:KEYOF[q.cat]||"other",desc:q.desc,cur:q.cur,amt:a,pb:me?"Me":"Other",split:q.split,stage:stageOf(q.date)};}
 const allRows=()=>(data?data.rows.map(srvRow):[]).concat(queue.map(qRow));
 const rm=r=>r.cur==="JPY"?r.amt*rate():r.amt;
+const mineV=r=>r.cur==="JPY"?r.meS*rate():r.meS;
+const val=r=>view==="mine"?mineV(r):rm(r);
 const RM=v=>"RM "+v.toLocaleString("en-MY",{minimumFractionDigits:2,maximumFractionDigits:2});
 const RM0=v=>"RM "+Math.round(v).toLocaleString();
 const ORIG=r=>r.cur==="JPY"?"¥"+Math.round(r.amt).toLocaleString():RM(r.amt);
@@ -70,22 +76,21 @@ const onTrip=r=>r.stage==="On-Trip";
 
 function dayBlocks(list){
  const by={};list.forEach(r=>(by[r.date]=by[r.date]||[]).push(r));
- return Object.keys(by).sort().reverse().map(d=>`<div class="day"><div class="dayh"><span class="n">${esc(+d.slice(8)||"")}</span><span><span class="w">${esc(dname(d))}</span><div class="y">${esc(d.slice(0,7).replace("-","/"))}</div></span><span class="t">${RM(by[d].reduce((s,r)=>s+rm(r),0))}</span></div>${by[d].map(r=>`<div class="tx">${ic(r.k)}<div class="m"><div>${esc(r.desc)}</div><small>${esc(CAT[r.k][1])} · ${r.pb==="Me"?"You paid":esc(partner())+" paid"}${r.split==="50/50 Split"?'<span class="tag">50/50</span>':""}</small></div><div class="a">${ORIG(r)}${r.cur==="JPY"?`<small>${RM(rm(r))}</small>`:""}</div></div>`).join("")}</div>`).join("");}
+ return Object.keys(by).sort().reverse().map(d=>`<div class="day"><div class="dayh"><span class="n">${esc(+d.slice(8)||"")}</span><span><span class="w">${esc(dname(d))}</span><div class="y">${esc(d.slice(0,7).replace("-","/"))}</div></span><span class="t">${RM(by[d].reduce((s,r)=>s+rm(r),0))}</span></div>${by[d].map(r=>`<div class="tx" data-r="${esc(r.key)}">${ic(r.k)}<div class="m"><div>${esc(r.desc)}</div><small>${esc(CAT[r.k][1])} · ${r.pb==="Me"?"You paid":esc(partner())+" paid"}${r.split==="50/50 Split"?'<span class="tag">50/50</span>':""}</small></div><div class="a">${ORIG(r)}${r.cur==="JPY"?`<small>${RM(rm(r))}</small>`:""}</div></div>`).join("")}</div>`).join("");}
 
 function render(){
- const rows=allRows(),T=today(),t=rows.filter(r=>r.date===T),tv=t.reduce((s,r)=>s+rm(r),0),trip=rows.filter(onTrip),tripv=trip.reduce((s,r)=>s+rm(r),0);
- $("hTodayK").textContent="Spent today · "+dname(T)+" "+(+T.slice(8))+" "+MON[(+T.slice(5,7)||1)-1];
- $("hToday").textContent=RM(tv);$("hTodayY").textContent="¥"+Math.round(t.filter(r=>r.cur==="JPY").reduce((s,r)=>s+r.amt,0)).toLocaleString()+" · "+t.length+" items";
- $("hTrip").textContent=RM0(tripv);
- if(!tripM())$("hTripD").textContent="";
- else if(T<T0())$("hTripD").textContent="Starts "+fmtD(T0());
- else{const n=Math.min(tripDays(),Math.max(1,Math.round((dayMs(T)-dayMs(T0()))/864e5)+1));$("hTripD").textContent="Day "+n+" · "+RM0(tripv/n)+"/day";}
- const net=Math.round((data&&data.summary?Number(data.summary.net)||0:0)*100)/100;
- $("hOweK").textContent=net<0?"You owe "+partner():partner()+" owes you";$("hOwe").textContent=RM(Math.abs(net));
- const cs=KEYS.map(k=>[k,trip.filter(r=>r.k===k).reduce((s,r)=>s+rm(r),0)]).filter(c=>c[1]>0).sort((a,b)=>b[1]-a[1]);
+ const rows=allRows(),T=today(),t=rows.filter(r=>r.date===T),sum=L=>L.reduce((s,r)=>s+val(r),0),paid=rows.filter(r=>r.pb==="Me");
+ $("hTotal").textContent=RM(sum(rows));$("hTotalY").textContent="You paid "+RM(paid.reduce((s,r)=>s+rm(r),0))+" · "+paid.length+" items";
+ $("hToday").textContent=RM(sum(t));$("hTodayY").textContent="¥"+Math.round(t.filter(r=>r.cur==="JPY").reduce((s,r)=>s+r.amt,0)).toLocaleString()+" · "+t.length+" items";
+ const net=netv();$("hOweK").textContent=net>0?partner()+" owes you":net<0?"You owe "+partner():"All settled";$("hOwe").textContent=RM(Math.abs(net));
+ const cs=KEYS.map(k=>[k,sum(rows.filter(r=>r.k===k))]).filter(c=>c[1]>0).sort((a,b)=>b[1]-a[1]);
  $("tiles").innerHTML=cs.slice(0,6).map(([k,v])=>`<div class="tile" style="background:${CAT[k][3]}">${ic(k)}<span>${CAT[k][1]}</span><b>${RM0(v)}</b></div>`).join("");
  $("list").innerHTML=rows.length?dayBlocks(rows):'<div class="card y">No expenses yet. Tap + to add the first one.</div>';
- stats();cal();setRender();pill();}
+ stats();cal();setRender();pill();pRender();}
+const netv=()=>Math.round((data&&data.summary?Number(data.summary.net)||0:0)*100)/100;
+$("view").onclick=e=>{const b=e.target.closest("button");if(!b)return;view=b.dataset.w==="all"?"all":"mine";sset("tw.view",view);syncView();render();};
+function syncView(){[...$("view").children].forEach(x=>x.classList.toggle("on",x.dataset.w===view));}
+syncView();
 
 let scope="trip";
 function stats(){
@@ -147,8 +152,8 @@ $("signOut").onclick=()=>modal(`<div class="k">Sign out on all phones?</div><div
  else{closeModal();toast("No connection. Try again.");}}});
 $("lockNow").onclick=()=>lock(false);
 $("faceRow").onclick=()=>{if(credId())return;
- if(!faceOK){toast("Face ID is not available on this phone");return;}
- Face.create().then(id=>{sset("tw.cred",id);setRender();toast("Face ID is on");}).catch(()=>toast("Could not set up Face ID"));};
+ if(!faceOK){toast("Face ID / fingerprint is not available");return;}
+ Face.create().then(id=>{sset("tw.cred",id);setRender();toast("Face ID / fingerprint is on");}).catch(()=>toast("Could not set up Face ID / fingerprint"));};
 
 /* ---------- add sheet ---------- */
 let cur="JPY",amt="",cat="food";
@@ -163,30 +168,87 @@ function syncSheet(){[...$("cur").children].forEach(x=>x.classList.toggle("on",x
 $("keys").innerHTML=["7","8","9","⌫","4","5","6","00","1","2","3","Save","",".","0",""].map((k,i)=>k===""&&i===12?`<button class="fn" data-k="c">C</button>`:k===""?"":`<button data-k="${k}" class="${k==="Save"?"ok":/⌫|00/.test(k)?"fn":""}">${k}</button>`).join("");
 $("keys").onclick=e=>{const k=e.target.dataset.k;if(!k)return;if(k==="Save")return save();if(k==="⌫")amt=amt.slice(0,-1);else if(k==="c")amt="";
  else if(k==="."){if(cur==="MYR"&&!amt.includes("."))amt=(amt||"0")+".";}else if(amt.length<9&&!(amt.includes(".")&&amt.split(".")[1].length>=2)&&(amt.includes(".")||amt.length+k.length<=7))amt=(amt+k).replace(/^0+(?=\d)/,"").replace(/(\.\d\d)\d+$/,"$1");show();};
-function openS(){$("dt").value=today();syncSheet();$("scrim").classList.add("open");$("sheet").classList.add("open");}
-function closeS(){$("scrim").classList.remove("open");$("sheet").classList.remove("open");}
+function chipOn(g,f){[...document.querySelector('[data-g="'+g+'"]').children].forEach(x=>x.classList.toggle("on",f(x)));}
+function openSheet(el){$("scrim").classList.add("open");el.classList.add("open");}
+function openS(){edit=null;$("stitle").textContent="New expense";$("delBtn").hidden=true;$("dt").value=today();syncSheet();openSheet($("sheet"));}
+function closeS(){$("scrim").classList.remove("open");$("sheet").classList.remove("open");$("sheet2").classList.remove("open");
+ if(edit){edit=null;amt="";$("desc").value="";const l=sget("tw.last",null);cat=l&&CAT[l.cat]?l.cat:"food";cur=l&&(l.cur==="JPY"||l.cur==="MYR")?l.cur:"JPY";
+  chipOn("pb",x=>x.dataset.p==="me");chipOn("sp",x=>x.textContent==="50/50");$("stitle").textContent="New expense";$("delBtn").hidden=true;syncSheet();}
+ pBack();}
 $("plus").onclick=openS;$("cancel").onclick=closeS;$("scrim").onclick=closeS;$("save2").onclick=()=>save();
-(()=>{const sh=$("sheet");let y0=null,t0=0,dy=0;
+[$("sheet"),$("sheet2")].forEach(sh=>{let y0=null,t0=0,dy=0;
  const down=e=>{if(e.target.closest("button"))return;y0=e.clientY;t0=e.timeStamp;dy=0;sh.style.transition="none";sh.setPointerCapture(e.pointerId);};
  sh.addEventListener("pointerdown",e=>{if(e.target.closest(".grab,.shead"))down(e);});
  sh.addEventListener("pointermove",e=>{if(y0===null)return;dy=Math.max(0,e.clientY-y0);sh.style.transform=`translateY(${dy}px)`;$("scrim").style.opacity=1-Math.min(dy/400,.8);});
  const up=e=>{if(y0===null)return;const v=dy/Math.max(1,e.timeStamp-t0);y0=null;sh.style.transition="";$("scrim").style.opacity="";
   if(dy>120||v>.6)closeS();sh.style.transform="";};
- sh.addEventListener("pointerup",up);sh.addEventListener("pointercancel",up);})();
+ sh.addEventListener("pointerup",up);sh.addEventListener("pointercancel",up);});
 function uuid(){if(crypto.randomUUID)return crypto.randomUUID();const b=crypto.getRandomValues(new Uint8Array(16));return[...b].map(x=>x.toString(16).padStart(2,"0")).join("");}
-function save(){
+const SPCHIP={"50/50 Split":"50/50","Exact Amount":"Only mine","100% Owed by Other":"Other pays all"};
+async function save(){
  const raw=parseFloat(amt||"0"),a=cur==="JPY"?Math.round(raw):Math.round(raw*100)/100;
  if(!a){again(document.querySelector(".amount"),"shake");toast("Type an amount first");return;}
  if(a>=1e7){again(document.querySelector(".amount"),"shake");toast("Amount is too big");return;}
  const dv=$("dt").value||today();if(dv<"2026-01-01"||dv>"2027-12-31"){toast("Check the date");return;}
  const sp=document.querySelector('[data-g="sp"] .on').textContent,pb=document.querySelector('[data-g="pb"] .on').dataset.p;
- queue.push({id:uuid(),date:dv,cat:CAT[cat][0],desc:$("desc").value.trim()||CAT[cat][1],cur,amt:a,paidBy:pb==="other"?"other":"me",split:sp==="50/50"?"50/50 Split":sp==="Other pays all"?"100% Owed by Other":"Exact Amount"});
+ const item={date:dv,cat:CAT[cat][0],desc:$("desc").value.trim()||CAT[cat][1],cur,amt:a,paidBy:pb==="other"?"other":"me",split:sp==="50/50"?"50/50 Split":sp==="Other pays all"?"100% Owed by Other":"Exact Amount"};
+ if(edit&&edit.q){const i=queue.findIndex(x=>x.id===edit.q);if(i>=0)queue[i]=Object.assign({id:edit.q},item);saveQ();closeS();toast("Saved");render();flush();return;}
+ if(edit){if(wbusy)return;if(edit.other>0&&item.split==="Exact Amount"&&sp===SPCHIP["Exact Amount"])item.other=edit.other;
+  wbusy=true;const r=await api(Object.assign({a:"edit",token:token(),row:edit.row,was:edit.was},item));wbusy=false;result(r,"Updated",closeS);return;}
+ queue.push(Object.assign({id:uuid()},item));
  saveQ();sset("tw.last",{cat,cur});amt="";$("desc").value="";show();closeS();toast("Saved");render();flush();}
+function openEdit(key){
+ const r=allRows().find(x=>x.key===key);if(!r)return;const w=r.q||r.was;
+ edit=r.q?{q:r.q.id}:{row:r.row,was:r.was,other:r.other};
+ cur=w.cur;cat=r.k;amt=String(w.amt);$("desc").value=w.desc;$("dt").value=w.date;
+ chipOn("pb",x=>x.dataset.p===w.paidBy);chipOn("sp",x=>x.textContent===SPCHIP[w.split]);
+ $("stitle").textContent="Edit expense";$("delBtn").hidden=false;syncSheet();openSheet($("sheet"));}
+const tapRow=e=>{const t=e.target.closest(".tx[data-r]");if(t)openEdit(t.dataset.r);};
+$("list").onclick=tapRow;$("calList").onclick=tapRow;
+function confirmDel(what,go){modal(`<div class="k">Delete this ${what}?</div><button class="link" style="color:var(--spend)" data-a="go">Delete</button><button class="link" data-a="no">Cancel</button>`,{no:closeModal,go:()=>{closeModal();go();}});}
+$("delBtn").onclick=()=>{const e=edit;if(!e)return;confirmDel("expense",async()=>{
+ if(e.q){queue=queue.filter(x=>x.id!==e.q);saveQ();closeS();render();toast("Deleted");return;}
+ if(wbusy)return;wbusy=true;const r=await api({a:"del",token:token(),row:e.row,was:e.was});wbusy=false;result(r,"Deleted",closeS);});};
+/* one answer handler for edit, delete and pay-back writes */
+function result(r,msg,done){
+ if(r.ok){setCache(r);render();if(done)done();toast(msg);}
+ else if(r.err==="changed"){if(done)done();toast("This item changed. List refreshed.");refresh();}
+ else if(r.err==="auth")signedOut();
+ else toast(r.err==="net"?"No connection. Try again.":r.err==="full"?"Sheet is full.":r.err==="rate"?"Too many tries. Wait a little.":r.err==="bad"?"Sheet refused this item":"Something went wrong. Try again.");}
+
+/* ---------- settle sheet ---------- */
+const pays=()=>data&&Array.isArray(data.pays)?data.pays:[];
+function pRender(){
+ const n=netv();$("pNet").textContent=n>0?partner()+" owes you":n<0?"You owe "+partner():"All settled";$("pNetV").textContent=RM(Math.abs(n));
+ const ps=pays().slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.row-a.row);
+ $("pList").innerHTML=ps.length?ps.map(p=>`<div class="tx" data-p="${p.row}"><div class="m"><div>${esc(fmtD(String(p.date)))} · ${p.from==="me"?"You paid "+esc(partner()):esc(partner())+" paid you"}</div>${p.ref?`<small>${esc(p.ref)}</small>`:""}</div><div class="a">${p.cur==="JPY"?"¥"+Math.round(p.amt).toLocaleString():RM(p.amt)}${p.cur==="JPY"?`<small>${RM(p.myr>0?p.myr:p.amt*rate())}</small>`:""}</div></div>`).join(""):'<div class="y" style="padding:12px 16px">No pay-backs yet.</div>';
+ $("pdMe").textContent="I paid "+partner();$("pdOther").textContent=partner()+" paid me";}
+function pBack(){$("pForm").hidden=true;$("pView").hidden=false;$("ptitle").textContent="Settle up";pedit=null;}
+function pOpen(p){pedit=p?{row:p.row,was:{date:String(p.date),from:p.from,cur:p.cur,amt:p.amt}}:null;
+ $("pView").hidden=true;$("pForm").hidden=false;$("ptitle").textContent=p?"Edit pay-back":"Add pay-back";
+ chipOn("pd",x=>x.dataset.d===(p?p.from:netv()>0?"other":"me"));chipOn("pc",x=>x.dataset.c===(p?p.cur:"MYR"));
+ $("pAmt").value=p?String(p.amt):"";$("pDt").value=p?String(p.date):today();$("pRef").value=p?p.ref:"";$("pNote").value=p?p.notes:"";$("pDel").hidden=!p;}
+async function pSave(){
+ if(wbusy)return;
+ const cu=document.querySelector('[data-g="pc"] .on').dataset.c;let a=Number(String($("pAmt").value).replace(/,/g,""));
+ a=cu==="JPY"?Math.round(a):Math.round(a*100)/100;
+ if(!(a>0)){toast("Type an amount first");return;}
+ if(a>=1e7){toast("Amount is too big");return;}
+ const dv=$("pDt").value||today();if(dv<"2026-01-01"||dv>"2027-12-31"){toast("Check the date");return;}
+ const f={date:dv,from:document.querySelector('[data-g="pd"] .on').dataset.d,cur:cu,amt:a,ref:$("pRef").value.trim(),notes:$("pNote").value.trim()};
+ const was=pedit;wbusy=true;
+ const r=await api(was?Object.assign({a:"pay_edit",token:token(),row:was.row,was:was.was},f):Object.assign({a:"pay",token:token(),id:uuid()},f));
+ wbusy=false;result(r,was?"Updated":"Pay-back saved",pBack);}
+$("oweCard").onclick=()=>{pBack();pRender();openSheet($("sheet2"));};
+$("pAdd").onclick=()=>pOpen(null);$("pBack").onclick=pBack;$("pClose").onclick=closeS;$("pSave").onclick=pSave;
+$("pList").onclick=e=>{const t=e.target.closest("[data-p]");if(!t)return;const p=pays().find(x=>String(x.row)===t.dataset.p);if(p)pOpen(p);};
+$("pDel").onclick=()=>{const was=pedit;if(!was)return;confirmDel("pay-back",async()=>{
+ if(wbusy)return;wbusy=true;const r=await api({a:"pay_del",token:token(),row:was.row,was:was.was});wbusy=false;result(r,"Deleted",pBack);});};
 
 /* ---------- queue ---------- */
 let fullStop=false;
-function setCache(r){data={ok:true,rows:r.rows,rowsLeft:r.rowsLeft,rowsMax:r.rowsMax,rate:r.rate,summary:r.summary,meta:r.meta||null};sset("tw.cache",data);}
-function signedOut(msg){sdel("tw.token");closeModal();render();lock(true);toast(msg||"Please sign in again");}
+function setCache(r){data={ok:true,rows:r.rows,rowsLeft:r.rowsLeft,rowsMax:r.rowsMax,rate:r.rate,summary:r.summary,pays:r.pays||[],meta:r.meta||null};sset("tw.cache",data);}
+function signedOut(msg){sdel("tw.token");closeModal();closeS();render();lock(true);toast(msg||"Please sign in again");}
 async function flush(){
  if(sending||fullStop||!queue.length||!token())return;
  sending=true;pill();
@@ -198,7 +260,7 @@ async function flush(){
    if(r.ok){queue.shift();saveQ();setCache(r);render();toast("Added to your sheet");}
    else if(r.err==="auth"){signedOut();break;}
    else if(r.err==="bad"){queue.shift();saveQ();render();toast("Sheet refused this item");}
-   else if(r.err==="full"){fullStop=true;toast("Sheet is full (row 100). Tell me to extend it.");break;}
+   else if(r.err==="full"){fullStop=true;toast("Sheet is full.");break;}
    else break;
   }
  }finally{sending=false;pill();}
@@ -216,7 +278,7 @@ document.addEventListener("visibilitychange",()=>{
  if(credId()&&token()&&$("lock").hidden&&hiddenAt&&Date.now()-hiddenAt>60000){lock(false);return;}
  if($("lock").hidden)flush().then(refresh);else flush();});
 
-/* ---------- Face ID (local lock only) ---------- */
+/* ---------- Face ID / fingerprint (local lock only) ---------- */
 const b64u=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const unb64u=s=>Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")+"=".repeat((4-s.length%4)%4)),c=>c.charCodeAt(0));
 const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
@@ -233,7 +295,7 @@ let faceOK=false,faceMode="unlock";Face.supported().then(v=>{faceOK=v;});
 const FACE=$("faceSvg").innerHTML,CHECK='<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16 9.8"/>';
 function step(id){["stepG","stepF"].forEach(s=>$(s).hidden=s!==id);again($(id),"step");if(id==="stepG")ensureG();}
 function lock(signedOutMode){const L=$("lock");L.hidden=false;void L.offsetWidth;L.classList.remove("gone");
- $("faceSvg").innerHTML=FACE;$("face").className="face";$("stepF").classList.remove("done");$("stepF").querySelector("h2").textContent="Trip Wallet is locked";$("stepF").querySelector(".sub").textContent="Tap to unlock with Face ID";$("faceBtn").hidden=false;faceMode="unlock";$("faceBtn").textContent="Use Face ID";$("faceAlt").hidden=false;$("faceNot").hidden=true;
+ $("faceSvg").innerHTML=FACE;$("face").className="face";$("stepF").classList.remove("done");$("stepF").querySelector("h2").textContent="Trip Wallet is locked";$("stepF").querySelector(".sub").textContent="Tap to unlock with Face ID / fingerprint";$("faceBtn").hidden=false;faceMode="unlock";$("faceBtn").textContent="Unlock";$("faceAlt").hidden=false;$("faceNot").hidden=true;
  resetG();step(signedOutMode?"stepG":"stepF");}
 function tick(){const f=$("face");$("faceSvg").innerHTML=CHECK;f.className="face ok";$("stepF").classList.add("done");$("stepF").querySelector("h2").textContent="Unlocked";setTimeout(openApp,420);}
 function openApp(){const L=$("lock");L.classList.add("gone");setTimeout(()=>{L.hidden=true;enter($("v-home"));},500);afterOpen();}
@@ -242,7 +304,7 @@ async function unlock(){if(unlocking)return;unlocking=true;const f=$("face");f.c
  try{await Face.verify();tick();}catch(_){f.className="face";again(f,"shake");}
  unlocking=false;}
 function enableFace(){const f=$("face");if(f.className==="face scan")return;f.className="face scan";
- Face.create().then(id=>{sset("tw.cred",id);tick();}).catch(()=>{f.className="face";again(f,"shake");toast("Could not set up Face ID");});}
+ Face.create().then(id=>{sset("tw.cred",id);tick();}).catch(()=>{f.className="face";again(f,"shake");toast("Could not set up Face ID / fingerprint");});}
 $("face").onclick=$("faceBtn").onclick=()=>faceMode==="setup"?enableFace():unlock();
 $("faceNot").onclick=openApp;
 $("faceAlt").onclick=()=>{sdel("tw.cred");sdel("tw.token");lock(true);};
@@ -274,60 +336,100 @@ async function handleSignIn(r,authMsg){
 function afterSignIn(){
  if(credId()||!faceOK){openApp();return;}
  faceMode="setup";step("stepF");$("faceSvg").innerHTML=FACE;$("face").className="face";$("stepF").classList.remove("done");
- $("stepF").querySelector("h2").textContent="Turn on Face ID?";$("stepF").querySelector(".sub").textContent="Lock the app each time you open it";
- $("faceBtn").hidden=false;$("faceBtn").textContent="Turn on Face ID";$("faceAlt").hidden=true;$("faceNot").hidden=false;}
+ $("stepF").querySelector("h2").textContent="Turn on Face ID / fingerprint?";$("stepF").querySelector(".sub").textContent="Lock the app each time you open it";
+ $("faceBtn").hidden=false;$("faceBtn").textContent="Turn on";$("faceAlt").hidden=true;$("faceNot").hidden=false;}
 $("codeLink").onclick=()=>{const b=$("codeBox");b.hidden=!b.hidden;if(!b.hidden)$("codeIn").focus();};
 $("codeIn").addEventListener("input",()=>{$("codeIn").value=$("codeIn").value.toUpperCase().replace(/[^A-Z0-9]/g,"");});
 $("codeGo").onclick=async()=>{const c=$("codeIn").value.trim();if(c.length<8){toast("Type the 8-character code");return;}
  setBusy();handleSignIn(await api({a:"pair",code:c}),"That code did not work");};
 
-/* ---------- mock transport (same six actions and rules as backend/Code.gs) ---------- */
+/* ---------- mock transport (same actions and rules as backend/Code.gs; ?as=other signs in as the second person) ---------- */
 const MRATE=0.0264,MCATS=["Hotel / Accommodation","Flights & Passes","Food & Dining","Transit & Trains","Tickets & Attractions","Shopping","Other"],MSPL=["50/50 Split","Exact Amount","100% Owed by Other"];
+const MU=QS.get("as")==="other"?1:0,MNAMES=["Alex","Sam"],MTRIP="2026-11-24";
 let mockEpoch=0;
-function mShares(cur,amt,paidBy,split,other){
- const v=cur==="JPY"?amt*MRATE:amt,H=paidBy==="me";let ds,hs;
- if(split==="50/50 Split"){ds=hs=v/2;}
- else if(split==="100% Owed by Other"){if(H){ds=v;hs=0;}else{hs=v;ds=0;}}
- else{const o=other?(cur==="JPY"?other*MRATE:other):0;if(H){ds=o;hs=v-o;}else{hs=o;ds=v-o;}}
- return{otherShare:ds,meShare:hs,owed:H?ds:-hs};}
-function mRow(i,date,cat,desc,cur,amt,paidBy,split,other,id){
- const own=split==="Exact Amount"&&!other;
- return Object.assign({row:5+i,date,stage:stageOf(date),cat,desc,cur,amt,paidBy,split,other:other==null?null:other},mShares(cur,amt,paidBy,split,other),{status:own?"":"Unpaid",notes:"",id:id||"seed-"+i});}
+const mText=v=>String(v==null?"":v).replace(/[\u0000-\u001f]/g," ").replace(/^[\s=+\-@]+/,"").trim().slice(0,200);
+const mDateOk=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&d>="2026-01-01"&&d<="2027-12-31"&&!isNaN(Date.parse(d+"T00:00:00Z"));
+const mAmt=(v,cur)=>{let a=Number(v);if(!isFinite(a)||a<=0||a>=10000000)return 0;a=cur==="JPY"?Math.round(a):Math.round(a*100)/100;return a>0?a:0;};
+const mPaid=r=>r.p===MU?"me":"other";
+const mTol=(a,b)=>Math.abs(a-Number(b))<.005;
+function mShares(cur,amt,p,split,other){/* row currency, absolute payers: s0 = payer 0 share, s1 = payer 1 share */
+ let s0,s1;
+ if(split==="50/50 Split"){s0=s1=amt/2;}
+ else if(split==="100% Owed by Other"){if(p===0){s1=amt;s0=0;}else{s0=amt;s1=0;}}
+ else{const o=other||0;if(p===0){s1=o;s0=amt-o;}else{s0=o;s1=amt-o;}}
+ return{s0,s1,owed:p===0?s1:-s0};}
+const mRow=(x,p,other,id)=>({date:x.date,cat:x.cat,desc:x.desc,cur:x.cur,amt:x.amt,p,split:x.split,other:other==null?null:other,status:x.split==="Exact Amount"&&!other?"":"Unpaid",notes:"",id});
+function mExp(p){
+ const date=String(p.date||""),cur=p.cur,split=p.split,desc=mText(p.desc);
+ if(!mDateOk(date)||MCATS.indexOf(p.cat)<0||["JPY","MYR"].indexOf(cur)<0||["me","other"].indexOf(p.paidBy)<0||MSPL.indexOf(split)<0||!desc)return null;
+ const amt=mAmt(p.amt,cur);if(!amt)return null;let other=null;
+ if(split==="Exact Amount"&&p.other!=null&&p.other!==""){other=Number(p.other);if(!isFinite(other)||other<0||other>amt)return null;}
+ return{date,cat:p.cat,desc,cur,amt,split,other,p:p.paidBy==="me"?MU:1-MU};}
+function mPay(p){
+ const date=String(p.date||""),cur=p.cur;
+ if(!mDateOk(date)||["me","other"].indexOf(p.from)<0||["JPY","MYR"].indexOf(cur)<0)return null;
+ const amt=mAmt(p.amt,cur);return amt?{date,cur,amt,p:p.from==="me"?MU:1-MU,ref:mText(p.ref),notes:mText(p.notes)}:null;}
+const mHit=(r,w)=>r.date===String(w.date)&&r.cat===w.cat&&r.desc===String(w.desc)&&r.cur===w.cur&&mTol(r.amt,w.amt)&&mPaid(r)===w.paidBy&&r.split===w.split;
+const mPayHit=(r,w)=>r.date===String(w.date)&&r.cur===w.cur&&mTol(r.amt,w.amt)&&mPaid(r)===w.from;
+const mMyr=r=>r.cur==="JPY"?Math.round(r.amt*MRATE*100)/100:r.amt;
 function mList(){
- const m=window.__mock,rows=m.rows;let total=0,d=0,h=0,net=0;
- rows.forEach(r=>{total+=r.cur==="JPY"?r.amt*MRATE:r.amt;d+=r.otherShare;h+=r.meShare;net+=r.owed;});
- return JSON.parse(JSON.stringify({ok:true,rows:rows.map(r=>{const c=Object.assign({},r);delete c.id;return c;}),rowsLeft:96-rows.length,rowsMax:96,meta:{sheet:"Demo Sheet",me:"Alex",other:"Sam",trip:{name:"Testville",start:"2026-11-24",end:"2026-12-04"}},rate:MRATE,summary:{total,otherShare:d,meShare:h,net}}));}
+ const m=window.__mock,u=MU,sg=u?-1:1;let total=0,t0=0,t1=0,N=0,n=0;const rows=[],pays=[];
+ m.rows.forEach((r,i)=>{if(!r)return;n++;const s=mShares(r.cur,r.amt,r.p,r.split,r.other),f=r.cur==="JPY"?MRATE:1;
+  total+=r.amt*f;t0+=s.s0*f;t1+=s.s1*f;if(r.status!=="Settled")N+=s.owed*f;
+  rows.push({row:5+i,date:r.date,stage:r.date>=MTRIP?"On-Trip":"Pre-Trip",cat:r.cat,desc:r.desc,cur:r.cur,amt:r.amt,paidBy:mPaid(r),split:r.split,other:r.other,meShare:u?s.s1:s.s0,otherShare:u?s.s0:s.s1,owed:sg*s.owed,status:r.status,notes:r.notes});});
+ m.pays.forEach((r,i)=>{if(!r)return;N+=r.p===0?mMyr(r):-mMyr(r);pays.push({row:5+i,date:r.date,from:mPaid(r),cur:r.cur,amt:r.amt,myr:mMyr(r),ref:r.ref,notes:r.notes});});
+ return JSON.parse(JSON.stringify({ok:true,rows,pays,rowsLeft:96-n,rowsMax:96,meta:{sheet:"Demo Sheet",me:MNAMES[u],other:MNAMES[1-u],trip:{name:"Testville",start:MTRIP,end:"2026-12-04"}},rate:MRATE,summary:{total,meShare:u?t1:t0,otherShare:u?t0:t1,net:sg*N}}));}
 if(MOCK){
- window.__mock={rows:[],fail:null,face:null,codes:[]};
- [["2026-10-29","Hotel / Accommodation","City hotel","MYR",579,"50/50 Split"],["2026-11-05","Hotel / Accommodation","Mountain lodge","MYR",3367.70,"50/50 Split"],["2026-10-29","Hotel / Accommodation","Airport hotel","MYR",1164.49,"50/50 Split"],["2026-09-25","Tickets & Attractions","Theme park tickets","MYR",1931.70,"50/50 Split"],["2026-11-21","Transit & Trains","Rail pass","MYR",86.10,"Exact Amount"],["2026-11-21","Transit & Trains","Transit card top-up","JPY",13800,"Exact Amount"],["2026-11-21","Other","Travel insurance","MYR",202.37,"Exact Amount"]]
-  .forEach((x,i)=>window.__mock.rows.push(mRow(i,x[0],x[1],x[2],x[3],x[4],"me",x[5],null)));
+ window.__mock={rows:[],pays:[],deleted:[],fail:null,face:null,codes:[]};
+ [["2026-10-29","Hotel / Accommodation","City hotel","MYR",579,"50/50 Split",0],["2026-11-05","Hotel / Accommodation","Mountain lodge","MYR",3367.70,"50/50 Split",0],["2026-10-29","Hotel / Accommodation","Airport hotel","MYR",1164.49,"50/50 Split",0],["2026-09-25","Tickets & Attractions","Theme park tickets","MYR",1931.70,"50/50 Split",1],["2026-11-21","Transit & Trains","Rail pass","MYR",86.10,"Exact Amount",0],["2026-11-21","Transit & Trains","Transit card top-up","JPY",13800,"Exact Amount",0],["2026-11-21","Other","Travel insurance","MYR",202.37,"Exact Amount",0]]
+  .forEach((x,i)=>window.__mock.rows.push(mRow({date:x[0],cat:x[1],desc:x[2],cur:x[3],amt:x[4],split:x[5]},x[6],null,"seed-"+i)));
+ window.__mock.pays.push({id:"seedpay-0",date:"2026-11-24",p:1,cur:"MYR",amt:1504.80,ref:"Hotel + USJ",notes:""},{id:"seedpay-1",date:"2026-11-15",p:1,cur:"MYR",amt:2016.65,ref:"",notes:""});
 }
 const mAuth=t=>typeof t==="string"&&t.length===64&&t[0]==="m"&&t[1]===String(mockEpoch%10);
+const mTok=()=>"m"+(mockEpoch%10)+[...rnd(31)].map(x=>x.toString(16).padStart(2,"0")).join("");
+const mBad={ok:false,err:"bad"},mChanged={ok:false,err:"changed"},mFull={ok:false,err:"full"};
+const mRowOk=p=>Number.isInteger(p.row)&&p.row>=5&&p.row<=3000&&p.was&&typeof p.was==="object";
+const mSlot=(a,full)=>{let i=a.findIndex(r=>!r);if(i<0){if(full||a.length>=96)return-1;i=a.length;}return i;};
 async function mockApi(p){
  await sleep(80);const m=window.__mock;
  if(m.fail==="network")throw new Error("net");
- if(p.a==="signin")return typeof p.idToken==="string"&&p.idToken&&p.idToken.length<=4096?{ok:true,token:"m"+(mockEpoch%10)+[...rnd(31)].map(x=>x.toString(16).padStart(2,"0")).join("")}:{ok:false,err:"auth"};
+ if(p.a==="signin")return typeof p.idToken==="string"&&p.idToken&&p.idToken.length<=4096?{ok:true,token:mTok()}:{ok:false,err:"auth"};
  if(p.a==="pair"){const code=String(p.code||"").toUpperCase().replace(/[^A-Z0-9]/g,"");const i=m.codes.indexOf(code);
-  if(code.length!==8||i<0)return{ok:false,err:"auth"};m.codes.splice(i,1);return{ok:true,token:"m"+(mockEpoch%10)+[...rnd(31)].map(x=>x.toString(16).padStart(2,"0")).join("")};}
+  if(code.length!==8||i<0)return{ok:false,err:"auth"};m.codes.splice(i,1);return{ok:true,token:mTok()};}
  if(!mAuth(p.token)||m.fail==="auth")return{ok:false,err:"auth"};
  if(p.a==="list")return mList();
  if(p.a==="pair_new"){const A="ABCDEFGHJKMNPQRSTUVWXYZ23456789";let c="";for(const x of rnd(8))c+=A[x%A.length];m.codes.push(c);return{ok:true,code:c};}
  if(p.a==="signout_all"){mockEpoch++;return{ok:true};}
  if(p.a==="add"){
-  const date=String(p.date||""),cur=p.cur,split=p.split;let a=Number(p.amt);
-  const desc=String(p.desc==null?"":p.desc).replace(/[\u0000-\u001f]/g," ").replace(/^[\s=+\-@]+/,"").trim().slice(0,200),id=String(p.id||"");
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<"2026-01-01"||date>"2027-12-31"||isNaN(Date.parse(date+"T00:00:00Z")))return{ok:false,err:"bad"};
-  if(MCATS.indexOf(p.cat)<0||["JPY","MYR"].indexOf(cur)<0||["me","other"].indexOf(p.paidBy)<0||MSPL.indexOf(split)<0)return{ok:false,err:"bad"};
-  if(!isFinite(a)||a<=0||a>=10000000||!desc||!/^[A-Za-z0-9-]{8,64}$/.test(id))return{ok:false,err:"bad"};
-  a=cur==="JPY"?Math.round(a):Math.round(a*100)/100;if(a<=0)return{ok:false,err:"bad"};
-  let other=null;
-  if(split==="Exact Amount"&&p.other!=null&&p.other!==""){other=Number(p.other);if(!isFinite(other)||other<0||other>a)return{ok:false,err:"bad"};}
-  const seen=m.rows.findIndex(r=>r.id===id);
+  const x=mExp(p),id=String(p.id||"");if(!x||!/^[A-Za-z0-9-]{8,64}$/.test(id))return mBad;
+  const seen=m.rows.findIndex(r=>r&&r.id===id);
   if(seen>=0)return Object.assign(mList(),{row:5+seen,dup:true});
-  if(m.fail==="full"||m.rows.length>=96)return{ok:false,err:"full"};
-  m.rows.push(mRow(m.rows.length,date,p.cat,desc,cur,a,p.paidBy,split,other,id));
-  return Object.assign(mList(),{row:4+m.rows.length});}
- return{ok:false,err:"bad"};}
+  const i=mSlot(m.rows,m.fail==="full");if(i<0)return mFull;
+  m.rows[i]=mRow(x,x.p,x.other,id);return Object.assign(mList(),{row:5+i});}
+ if(p.a==="edit"){
+  const x=mExp(p);if(!x||!mRowOk(p))return mBad;
+  const r=m.rows[p.row-5];if(!r||!mHit(r,p.was))return mChanged;
+  Object.assign(r,{date:x.date,cat:x.cat,desc:x.desc,cur:x.cur,amt:x.amt,p:x.p,split:x.split,other:x.other,status:x.split==="Exact Amount"&&!x.other?"":r.status||"Unpaid"});
+  return Object.assign(mList(),{row:p.row});}
+ if(p.a==="del"){
+  if(!mRowOk(p))return mBad;
+  const r=m.rows[p.row-5];if(!r||!mHit(r,p.was))return mChanged;
+  m.deleted.push(Object.assign({by:MNAMES[MU],tab:"Expense Log",row:p.row},r));m.rows[p.row-5]=null;return mList();}
+ if(p.a==="pay"){
+  const x=mPay(p),id=String(p.id||"");if(!x||!/^[A-Za-z0-9-]{8,64}$/.test(id))return mBad;
+  const seen=m.pays.findIndex(r=>r&&r.id===id);
+  if(seen>=0)return Object.assign(mList(),{row:5+seen,dup:true});
+  const i=mSlot(m.pays,m.fail==="full");if(i<0)return mFull;
+  m.pays[i]=Object.assign(x,{id});return Object.assign(mList(),{row:5+i});}
+ if(p.a==="pay_edit"){
+  const x=mPay(p);if(!x||!mRowOk(p))return mBad;
+  const r=m.pays[p.row-5];if(!r||!mPayHit(r,p.was))return mChanged;
+  Object.assign(r,x);return Object.assign(mList(),{row:p.row});}
+ if(p.a==="pay_del"){
+  if(!mRowOk(p))return mBad;
+  const r=m.pays[p.row-5];if(!r||!mPayHit(r,p.was))return mChanged;
+  m.deleted.push(Object.assign({by:MNAMES[MU],tab:"Settlements & Transfers",row:p.row},r));m.pays[p.row-5]=null;return mList();}
+ return mBad;}
 
 /* ---------- boot ---------- */
 if("serviceWorker"in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register("./sw.js").catch(()=>{});
