@@ -227,16 +227,17 @@ function pRender(){
 function pBack(){$("pForm").hidden=true;$("pView").hidden=false;$("ptitle").textContent="Settle up";pedit=null;}
 function pOpen(p){pedit=p?{row:p.row,was:{date:String(p.date),from:p.from,cur:p.cur,amt:p.amt}}:null;
  $("pView").hidden=true;$("pForm").hidden=false;$("ptitle").textContent=p?"Edit return":"Return money";
- chipOn("pd",x=>x.dataset.d===(p?p.from:netv()>0?"other":"me"));chipOn("pc",x=>x.dataset.c===(p?p.cur:"MYR"));
+ chipOn("pd",x=>!!p&&x.dataset.d===p.from);chipOn("pc",x=>x.dataset.c===(p?p.cur:"MYR"));
  $("pAmt").value=p?String(p.amt):"";$("pDt").value=p?String(p.date):today();$("pRef").value=p?p.ref:"";$("pNote").value=p?p.notes:"";$("pDel").hidden=!p;}
 async function pSave(){
  if(wbusy)return;
+ const de=document.querySelector('[data-g="pd"] .on');if(!de){again(document.querySelector('[data-g="pd"]'),"shake");toast("Pick who paid first");return;}
  const cu=document.querySelector('[data-g="pc"] .on').dataset.c;let a=Number(String($("pAmt").value).replace(/,/g,""));
  a=cu==="JPY"?Math.round(a):Math.round(a*100)/100;
  if(!(a>0)){toast("Type an amount first");return;}
  if(a>=1e7){toast("Amount is too big");return;}
  const dv=$("pDt").value||today();if(dv<"2026-01-01"||dv>"2027-12-31"){toast("Check the date");return;}
- const f={date:dv,from:document.querySelector('[data-g="pd"] .on').dataset.d,cur:cu,amt:a,ref:$("pRef").value.trim(),notes:$("pNote").value.trim()};
+ const f={date:dv,from:de.dataset.d,cur:cu,amt:a,ref:$("pRef").value.trim(),notes:$("pNote").value.trim()};
  const was=pedit;wbusy=true;busy("Saving…");
  const r=await api(was?Object.assign({a:"pay_edit",token:token(),row:was.row,was:was.was},f):Object.assign({a:"pay",token:token(),id:uuid()},f));
  wbusy=false;closeModal();result(r,was?"Updated":"Return saved",pBack);}
