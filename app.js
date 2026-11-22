@@ -84,7 +84,7 @@ function render(){
  $("hOweK").textContent=net<0?"You owe "+partner():partner()+" owes you";$("hOwe").textContent=RM(Math.abs(net));
  const cs=KEYS.map(k=>[k,trip.filter(r=>r.k===k).reduce((s,r)=>s+rm(r),0)]).filter(c=>c[1]>0).sort((a,b)=>b[1]-a[1]);
  $("tiles").innerHTML=cs.slice(0,6).map(([k,v])=>`<div class="tile" style="background:${CAT[k][3]}">${ic(k)}<span>${CAT[k][1]}</span><b>${RM0(v)}</b></div>`).join("");
- $("list").innerHTML=trip.length?dayBlocks(trip):'<div class="card y">No trip expenses yet. Tap + to add the first one.</div>';
+ $("list").innerHTML=rows.length?dayBlocks(rows):'<div class="card y">No expenses yet. Tap + to add the first one.</div>';
  stats();cal();setRender();pill();}
 
 let scope="trip";
