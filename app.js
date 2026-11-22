@@ -226,7 +226,7 @@ function pRender(){
  $("pdMe").textContent="I paid "+partner();$("pdOther").textContent=partner()+" paid me";}
 function pBack(){$("pForm").hidden=true;$("pView").hidden=false;$("ptitle").textContent="Settle up";pedit=null;}
 function pOpen(p){pedit=p?{row:p.row,was:{date:String(p.date),from:p.from,cur:p.cur,amt:p.amt}}:null;
- $("pView").hidden=true;$("pForm").hidden=false;$("ptitle").textContent=p?"Edit pay-back":"Add pay-back";
+ $("pView").hidden=true;$("pForm").hidden=false;$("ptitle").textContent=p?"Edit return":"Return money";
  chipOn("pd",x=>x.dataset.d===(p?p.from:netv()>0?"other":"me"));chipOn("pc",x=>x.dataset.c===(p?p.cur:"MYR"));
  $("pAmt").value=p?String(p.amt):"";$("pDt").value=p?String(p.date):today();$("pRef").value=p?p.ref:"";$("pNote").value=p?p.notes:"";$("pDel").hidden=!p;}
 async function pSave(){
@@ -239,8 +239,9 @@ async function pSave(){
  const f={date:dv,from:document.querySelector('[data-g="pd"] .on').dataset.d,cur:cu,amt:a,ref:$("pRef").value.trim(),notes:$("pNote").value.trim()};
  const was=pedit;wbusy=true;busy("Saving…");
  const r=await api(was?Object.assign({a:"pay_edit",token:token(),row:was.row,was:was.was},f):Object.assign({a:"pay",token:token(),id:uuid()},f));
- wbusy=false;closeModal();result(r,was?"Updated":"Pay-back saved",pBack);}
+ wbusy=false;closeModal();result(r,was?"Updated":"Return saved",pBack);}
 $("oweCard").onclick=()=>{pBack();pRender();openSheet($("sheet2"));};
+$("retBtn").onclick=()=>{pRender();pOpen(null);openSheet($("sheet2"));};
 $("pAdd").onclick=()=>pOpen(null);$("pBack").onclick=pBack;$("pClose").onclick=closeS;$("pSave").onclick=pSave;
 $("pList").onclick=e=>{const t=e.target.closest("[data-p]");if(!t)return;const p=pays().find(x=>String(x.row)===t.dataset.p);if(p)pOpen(p);};
 $("pDel").onclick=()=>{const was=pedit;if(!was)return;confirmDel("pay-back",async()=>{
